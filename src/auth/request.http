@@ -1,0 +1,29 @@
+### List all messages
+
+### Validate Token 
+POST http://localhost:3001/api/v1/auth/validatelogin
+content-type: application/json
+
+{
+    "token":"YOUR_AZURE_ENTRA_ID_TOKEN_HERE",
+    "loginprovider":"azureTokenValidation"
+}
+
+### Agregar Question
+POST http://localhost:3001/api/v1/question
+Content-Type: application/json
+
+{
+  "contexto": "Naturales",
+  "enunciado": "Aproximadamente, ¿cuántos huesos tiene el cuerpo humano?",
+  "opcionesRespuesta": "A"
+}
+
+### Actualizar Question
+PUT http://localhost:3001/api/v1/question/10
+Content-Type: application/json
+
+{
+  "contexto": "Ciencias Naturales",
+  "enunciado": "Aproximadamente, ¿cuántos huesos tiene el cuerpo humano?"
+}

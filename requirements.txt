@@ -1,0 +1,11 @@
+Test CRUD
+
+GET /tests
+GET /test/id
+POST /test
+PATCH /test/id
+DELETE /test/id
+
+Access:
+- If isEditor: create, read, delete
+- If isConstructor: read, update
