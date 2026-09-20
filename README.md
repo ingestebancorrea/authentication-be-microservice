@@ -1,73 +1,132 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Authentication BE Microservice
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Microservicio de autenticación para **Physionse**, construido con [NestJS](https://nestjs.com). Centraliza el registro e inicio de sesión de usuarios mediante federación con terceros (Google, Facebook, Azure AD) y provee JWT para el resto de los microservicios.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Patrón de desarrollo de software
 
-## Description
+### Arquitectura general: Arquitectura Modular en capas
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+NestJS organiza el código por **módulos** (`AppModule → AuthModule, UserModule, RoleModule, AuthTypeModule`). Dentro de cada módulo se aplica el principio de **separación de responsabilidades en capas**:
 
-## Installation
+```
+Request → Controller (HTTP) → Service (lógica de negocio) → Repository/Entity (datos) → PostgreSQL
+```
+
+- **Controllers**: manejan el contrato HTTP (`@Post`, `@Body`, decoradores Swagger).
+- **Services**: contienen la lógica de negocio y orquestan repositorios.
+- **Entities**: modelos mapeados a tablas con TypeORM.
+- **DTOs**: validación de entrada con `class-validator`.
+
+### Patrones específicos por dominio
+
+**1. Factory Method (fábrica) + Strategy — validación con terceros**
+
+La validación de tokens de Google/Facebook/Azure se resuelve con un patrón de fábrica que combina `Factory Method` y `Strategy`:
+
+- `IFederation` define la estrategia (`tokenValidate(token)`).
+- `GoogleFederation`, `FacebookFederation`, `AzureFederation` son las **estrategias concretas**.
+- `CreatorFactory` (clase abstracta) declara el método de factoría `factoryFederation()` y la plantilla `checkToken()`.
+- `CreateGoogleFederation`, `CreateAzureFederation`, `CreateFacebookFederation` son las **fábricas concretas**.
+- `federationObjects` (`FedarationObjects.ts`) es el registro (mapa) que asocia el `loginprovider` del request con su fábrica.
+
+```
+AuthController ──► AuthService.createUserWithRole(token, loginprovider, alias)
+                                    │
+                                    └──► CreatorFactory.checkToken() ◄── FederationObjects[loginprovider]
+                                              │
+                                              └──► factoryFederation() ──► IFederation.tokenValidate()
+```
+
+Ventaja: agregar un nuevo proveedor (ej. Apple) solo requiere crear `XxxFederation` + `CreateXxxFederation` y registrarlo en `federationObjects`, sin tocar el servicio.
+
+**2. Repository Pattern — acceso a datos**
+
+Los servicios inyectan `Repository<T>` de TypeORM (`@InjectRepository`), aislando las consultas SQL de la lógica de negocio.
+
+**3. Dependency Injection / Inversión de Control**
+
+Toda dependencia se inyecta por constructor (pattern nativo de NestJS), facilitando test con Mocks (ver `*.spec.ts`).
+
+**4. Observer (Subscribers de TypeORM)**
+
+`UserSubscriber` escucha eventos de entidades (`BeforeInsert`, `BeforeUpdate`) para lógica transversal (hooks de auditoría/registro).
+
+**5. Middleware global transversal**
+
+`AllExceptionsFilter` implementa un filtro global de excepciones (`app.useGlobalFilters`) que normaliza los errores HTTP.
+
+## Requisitos previos
+
+- Node.js 18+
+- PostgreSQL instalado y una base de datos creada para el proyecto
+
+## Configuración de entorno (.env)
+
+El archivo `.env` está en `.gitignore` y **no se versiona**. Debe contener las siguientes variables (valores reales solo en tu máquina local):
+
+```env
+PORT=
+DATABASE_URL=
+JWT_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_SECRET=
+JWKS_URI=
+AZURE_CLIENT_ID=
+URL_FACEBOOK_TOKEN_VALIDATION=
+```
+
+## Instalación y ejecución
 
 ```bash
 $ npm install
+$ npm run start       # desarrollo
+$ npm run start:dev   # watch mode
+$ npm run start:prod  # producción (compila a dist)
 ```
 
-## Running the app
+> **Importante**: en desarrollo el esquema se sincroniza automáticamente desde las entidades. No usar en producción sin migraciones.
+
+> Los datos sensibles (p. ej. contraseñas) se excluyen de las respuestas por defecto.
+
+## Flujo de autenticación
+
+1. El cliente (app RN) obtiene un **ID token** del proveedor elegido (Google Sign-In, Facebook Login o Microsoft Entra ID).
+2. Envía el token al backend con `loginprovider` y `alias_role`.
+3. El backend valida el token contra el proveedor vía el patrón Factory/Strategy.
+4. Si el usuario no existe, lo crea con el rol indicado, guarda el **método de autenticación** usado y responde un JWT.
+5. En `login`, si el email ya existe responde el JWT directamente; si no, `404`.
+
+## Métodos de autenticación
+
+Al crear un usuario se registra el método de autenticación utilizado (contraseña, Google, Facebook o Azure). El mapeo entre el proveedor de login y el tipo de autenticación está centralizado en `AuthService.PROVIDER_AUTH_TYPE`. Los usuarios creados por el endpoint de administración (`POST /users`) usan contraseña por defecto.
+
+## Estructura del proyecto
+
+```
+src/
+├── app.module.ts                 # Módulo raíz (Config, TypeORM, módulos)
+├── main.ts                       # Bootstrap, prefijo /api/v1/, Swagger, CORS
+├── auth/
+│   ├── auth.module.ts
+│   ├── auth.controller.ts        # /auth/register, /auth/login
+│   ├── auth.service.ts
+│   ├── dto/                      # register-user.dto, login.dto, return-user.dto
+│   └── services/
+│       ├── federation/           # IFederation + estrategias (Google/Azure/Facebook)
+│       └── factory/              # CreatorFactory + fábricas concretas + FedarationObjects
+├── user/                         # Módulo CRUD de usuarios
+├── role/                         # Módulo de roles
+├── auth-type/                    # Módulo de tipos de autenticación
+└── common/
+    ├── enum/error-messages.enum.ts
+    ├── filters/all-exceptions.filter.ts
+    └── subscriber/UserSubscriber.ts
+```
+
+## Pruebas
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+$ npm run test       # unit tests
+$ npm run test:e2e   # e2e tests
+$ npm run test:cov   # cobertura
 ```
-
-## Test
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).

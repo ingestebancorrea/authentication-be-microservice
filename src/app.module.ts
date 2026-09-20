@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
+import { AuthTypeModule } from './auth-type/auth-type.module';
 import { User } from './user/entities/user.entity';
 import { UserModule } from './user/user.module';
 import { ConfigModule } from '@nestjs/config';
@@ -21,6 +22,7 @@ import { ConfigModule } from '@nestjs/config';
       synchronize: true,
     }),
     AuthModule, 
+    AuthTypeModule, 
     UserModule, 
   ]
 })
