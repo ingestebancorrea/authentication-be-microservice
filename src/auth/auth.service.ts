@@ -53,7 +53,7 @@ export class AuthService {
       }
       user = await this.usersService.store(createUserDto, this.PROVIDER_AUTH_TYPE[loginprovider] ?? 'PASS');
     }else{
-      throw new ConflictException(`User ${payload.email} already is registered`);
+      throw new ConflictException(`Ya existe un usuario registrado con el email ${payload.email}`);
     }
     const access_token = this.jwtService.sign({ username: payload.email }, {secret: process.env.JWT_SECRET })
     return {...user,access_token}
