@@ -37,11 +37,11 @@ export class CreateUserDto {
 
     @ApiProperty({
         type: String,
-        description: 'This is a unique key',
+        description: 'Identificador generado por el proveedor de terceros (opcional)',
     })
     @IsString()
     @IsOptional()
-    sub:string
+    sub?:string
 
     @ApiProperty({
         type: String,
