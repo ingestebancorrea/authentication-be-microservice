@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
+import { PasswordService } from 'src/common/services/password.service';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateUpdateUser } from './dto/createUpdateUser.dto';
@@ -15,7 +16,8 @@ export class UsersService {
     @InjectRepository(User) 
     private userRepository: Repository<User>,
     @InjectRepository(AuthType)
-    private authTypeRepository: Repository<AuthType>
+    private authTypeRepository: Repository<AuthType>,
+    private passwordService: PasswordService,
   ){}
 
   async findAll(): Promise<User[]>  {
@@ -34,6 +36,7 @@ export class UsersService {
       try{
         const user = this.userRepository.create(createUserDto);
         user.authRole = createUserDto.role as unknown as Role;
+        user.password = await this.passwordService.hash(createUserDto.password);
         const saved = await this.userRepository.save(user);
 
         const authType = await this.authTypeRepository.findOne({ where: { alias: authTypeAlias } });
@@ -57,11 +60,14 @@ export class UsersService {
     const user = await this.userRepository.findOne({where:{id}});
     if(!user) throw new NotFoundException();
 
-    // WARNING: In this case password is stored as PLAINTEXT
-    // It is only for show how it works!!!
-    Object.assign(user, data);
+    // La contraseña nunca se escribe en claro: si viene en el payload se hashea.
+    const { password, ...safeData } = data as CreateUpdateUser & { password?: string };
+    Object.assign(user, safeData);
+    if (password) {
+      user.password = await this.passwordService.hash(password);
+    }
 
-    this.userRepository.update(id, user);
+    await this.userRepository.update(id, user);
     return user;
   }
 
