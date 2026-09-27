@@ -9,6 +9,7 @@ import { CreatorFactory } from './services/factory/CreatorFactory';
 import { User } from 'src/user/entities/user.entity';
 import { UserToReturnDto } from './dto/return-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
+import { PasswordService } from 'src/common/services/password.service';
 import { Role } from 'src/role/entities/role-entity';
 import { Repository } from 'typeorm';
 
@@ -18,6 +19,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private passwordService: PasswordService,
     @InjectRepository(Role) private rolRepository: Repository<Role>,
   ){}
 
@@ -90,7 +92,9 @@ export class AuthService {
 
   async loginPassword(dto: LoginPasswordDto) {
     const user = await this.usersService.findByEmailWithPassword(dto.username.toLowerCase().trim());
-    if (!user || user.password !== dto.password) {
+    const isValid = await this.passwordService.verify(dto.password, user?.password);
+
+    if (!user || !isValid) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -123,7 +127,7 @@ export class AuthService {
         name: user.displayName,
       },{
         secret: process.env.JWT_SECRET,
-        expiresIn:'60m'
+        expiresIn:'15m'
       }
     );
   }
