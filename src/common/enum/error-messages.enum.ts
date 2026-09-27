@@ -7,6 +7,8 @@ export enum ErrorMessages {
     ROLE_NOT_FOUND = 'El rol no existe',
     DEFAULT_REQUEST_EXCEPTION = 'Ha habido un error interno, intenta de nuevo.  Si el problema persiste por favor comunícate con atención al cliente',
     UNAUTHORIZED_EXCEPTION = 'Unauthorized exception',
+    MISSING_TOKEN = 'Falta el token de autorización',
+    INVALID_TOKEN = 'Token inválido o expirado',
     TOKEN_EXPIRED = 'El token expiró',
     FACEBOOK_EMAIL_NOT_AVAILABLE = 'La cuenta de Facebook no expuso un email válido. Verificá que el email esté confirmado y que el permiso email esté otorgado'
 }

@@ -5,6 +5,8 @@ import { AuthTypeModule } from './auth-type/auth-type.module';
 import { User } from './user/entities/user.entity';
 import { UserModule } from './user/user.module';
 import { ConfigModule } from '@nestjs/config';
+import { CommonModule } from './common/common.module';
+import { JwtConfigModule } from './auth/jwt.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { ConfigModule } from '@nestjs/config';
         isGlobal: true,
       }
     ),
+    CommonModule,
+    JwtConfigModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
