@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Google ID Token</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; max-width: 60rem; }
+    pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Google ID Token</h1>
+  <div id="google-btn"></div>
+
+  <h3>id_token</h3>
+  <pre id="idtoken">Aparecé después de apretar el botón de Google</pre>
+
+  <h3>Claims</h3>
+  <pre id="claims">Presioná el botón de Google…</pre>
+
+  <script>
+    // Client ID de la app web en Google Cloud Console. Es un identificador
+    // público (va embebido en las apps y en las páginas web), no un secreto.
+    // Debe coincidir con el GOOGLE_CLIENT_ID del .env: es el audience que
+    // valida GoogleFederation contra el claim aud del id_token.
+    const CLIENT_ID = '833883429702-q9no4751k0t4kp5s6g6ra248lopgjl27.apps.googleusercontent.com';
+
+    window.addEventListener('load', () => {
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: (response) => {
+          const idToken = response.credential;
+
+          document.getElementById('idtoken').textContent = idToken;
+          document.getElementById('claims').textContent = JSON.stringify(
+            JSON.parse(atob(idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))),
+            null,
+            2
+          );
+        },
+      });
+
+      google.accounts.id.renderButton(document.getElementById('google-btn'), { type: 'standard' });
+    });
+  </script>
+</body>
+</html>
