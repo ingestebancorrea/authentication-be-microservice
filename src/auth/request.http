@@ -1,29 +1,61 @@
-### List all messages
+### Puerto
+### El backend escucha en process.env.PORT (PORT=3000 del .env), no en 3001.
+### Con la app corriendo: npm run start:dev
 
-### Validate Token 
-POST http://localhost:3001/api/v1/auth/validatelogin
-content-type: application/json
+@host = http://localhost:3000/api/v1
 
-{
-    "token":"YOUR_AZURE_ENTRA_ID_TOKEN_HERE",
-    "loginprovider":"azureTokenValidation"
-}
+### Seed mínimo para poder registrar con password
+### Las filas ya existen en la base local:
+###   roles:      1=Fisioterapeuta (FIS), 2=Paciente (PAC)
+###   auth_types: 1=PASS, 2=FACEBOOK, 3=GOOGLE, 4=AZURE
 
-### Agregar Question
-POST http://localhost:3001/api/v1/question
+### Register con password -> devuelve el access_token de la API
+POST {{host}}/auth/register-password
 Content-Type: application/json
 
 {
-  "contexto": "Naturales",
-  "enunciado": "Aproximadamente, ¿cuántos huesos tiene el cuerpo humano?",
-  "opcionesRespuesta": "A"
+    "username": "prueba@physiosense.com",
+    "password": "Prueba123",
+    "full_name": "Prueba Uno",
+    "role": 1
 }
 
-### Actualizar Question
-PUT http://localhost:3001/api/v1/question/10
+### Login con password -> mismo access_token, dura 15m
+POST {{host}}/auth/login-password
 Content-Type: application/json
 
 {
-  "contexto": "Ciencias Naturales",
-  "enunciado": "Aproximadamente, ¿cuántos huesos tiene el cuerpo humano?"
+    "username": "prueba@physiosense.com",
+    "password": "Prueba123"
 }
+
+### Login federado de Google
+### El token es el id_token (JWT de 3 segmentos) que devuelve Google Identity
+### Services o Google Sign-In en la app mobile. Se puede obtener con
+### test/google-token.html se sirve por http (nunca file://):
+### npx serve -l 5500 test   y abrir http://localhost:5500/google-token.html
+### Ese origen tiene que estar en los Authorized JavaScript origins del
+### cliente web de Google. Ojo: el claim aud tiene que ser el GOOGLE_CLIENT_ID
+### del .env.
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+    "token": "GOOGLE_ID_TOKEN",
+    "loginprovider": "googleTokenValidation"
+}
+
+### Registro federado (solo la primera vez; si ya existe responde 409)
+### alias_role tiene que coincidir con el alias de la tabla roles: FIS o PAC
+POST {{host}}/auth/register
+Content-Type: application/json
+
+{
+    "token": "GOOGLE_ID_TOKEN",
+    "loginprovider": "googleTokenValidation",
+    "alias_role": "PAC"
+}
+
+### Endpoint protegido: usar el access_token del login
+GET {{host}}/users
+Authorization: Bearer {{access_token}}

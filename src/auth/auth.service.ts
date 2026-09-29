@@ -29,14 +29,15 @@ export class AuthService {
     azureTokenValidation: 'AZURE',
   };
   
-  async createUserWithRole(token:string, loginprovider: string, creatorFactory:CreatorFactory,aliasRole: string){
+  async createUserWithRole(token:string, loginprovider: string, creatorFactory:CreatorFactory, aliasRole: string){
     const payload = await creatorFactory.checkToken(token);//CreateAzureFederation instead of creatorFactory
     
     if(!payload){
       throw new BadRequestException(ErrorMessages.NOT_VALID_TOKEN)
     }
 
-    let user = await this.usersService.findByEmail(payload.email);
+    const email = payload.email?.toLowerCase().trim();
+    let user = email ? await this.usersService.findByEmail(email) : undefined;
     
     if(!user){
       const role = await this.rolRepository.findOne({ where: { alias: aliasRole } });
@@ -57,8 +58,9 @@ export class AuthService {
     }else{
       throw new ConflictException(`Ya existe un usuario registrado con el email ${payload.email}`);
     }
-    const access_token = this.jwtService.sign({ username: payload.email }, {secret: process.env.JWT_SECRET })
-    return {...user,access_token}
+    const userToReturn = this.mapUser(user);
+    const access_token = await this.generateAccesToken(userToReturn);
+    return { ...userToReturn, access_token }
   }
 
   async registerPassword(dto: RegisterPasswordDto) {
@@ -92,9 +94,13 @@ export class AuthService {
 
   async loginPassword(dto: LoginPasswordDto) {
     const user = await this.usersService.findByEmailWithPassword(dto.username.toLowerCase().trim());
-    const isValid = await this.passwordService.verify(dto.password, user?.password);
+    if (!user) {
+      await this.passwordService.verify(dto.password, null);
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
 
-    if (!user || !isValid) {
+    const isValid = await this.passwordService.verify(dto.password, user.password);
+    if (!isValid) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -109,7 +115,8 @@ export class AuthService {
       throw new BadRequestException(ErrorMessages.NOT_VALID_TOKEN)
     }
 
-    const user = await this.usersService.findByEmail(payload.email);
+    const email = payload.email?.toLowerCase().trim();
+    const user = email ? await this.usersService.findByEmail(email) : undefined;
     if(!user){
       throw new NotFoundException(`User ${payload.email} not found`);
     }
@@ -119,11 +126,11 @@ export class AuthService {
     return {...userToReturn,access_token}
   }
 
-  async generateAccesToken(user:any){
+  async generateAccesToken(user:UserToReturnDto){
     return await this.jwtService.signAsync(
       {
-        uuid: user.uid, 
-        username: user.email, 
+        uuid: user.id,
+        username: user.email,
         name: user.displayName,
       },{
         secret: process.env.JWT_SECRET,
