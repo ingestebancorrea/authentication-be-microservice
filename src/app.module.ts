@@ -7,6 +7,8 @@ import { UserModule } from './user/user.module';
 import { ConfigModule } from '@nestjs/config';
 import { CommonModule } from './common/common.module';
 import { JwtConfigModule } from './auth/jwt.module';
+import { PhysiotherapistModule } from './physiotherapist/physiotherapist.module';
+import { PatientModule } from './patient/patient.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { JwtConfigModule } from './auth/jwt.module';
     AuthModule, 
     AuthTypeModule, 
     UserModule, 
+    PhysiotherapistModule,
+    PatientModule, 
   ]
 })
 export class AppModule {}
