@@ -1,8 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { HttpException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
 import { PasswordService } from 'src/common/services/password.service';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateUpdateUser } from './dto/createUpdateUser.dto';
 import { User } from './entities/user.entity';
@@ -32,28 +32,50 @@ export class UsersService {
       return this.userRepository.find(criteria);
   }
 
-  async store(createUserDto:CreateUserDto, authTypeAlias = 'PASS') {
-      try{
-        const user = this.userRepository.create(createUserDto);
-        user.authRole = createUserDto.role as unknown as Role;
-        user.password = await this.passwordService.hash(createUserDto.password);
-        const saved = await this.userRepository.save(user);
+  /**
+   * Crea el usuario y lo vincula con su auth type.
+   *
+   * `manager` permite que la escritura se integre en una transacción abierta por
+   * otro servicio (registro con perfil). Si no se pasa, se usan los repositorios
+   * por defecto y la operación queda fuera de cualquier transacción.
+   *
+   * `errorFactory` permite conservar el error de negocio (por ejemplo un 409 por
+   * username duplicado) en lugar de convertirlo siempre en un 500.
+   */
+  async store(
+    createUserDto: CreateUserDto,
+    authTypeAlias = 'PASS',
+    manager?: EntityManager,
+    errorFactory: (error: unknown) => HttpException = () =>
+      new InternalServerErrorException(ErrorMessages.INTERNAL_SERVER_ERROR),
+  ) {
+    const userRepository = manager ? manager.getRepository(User) : this.userRepository;
+    const authTypeRepository = manager
+      ? manager.getRepository(AuthType)
+      : this.authTypeRepository;
 
-        const authType = await this.authTypeRepository.findOne({ where: { alias: authTypeAlias } });
-        if (authType) {
-          await this.userRepository
-            .createQueryBuilder()
-            .relation(User, 'authTypes')
-            .of(saved.id)
-            .add(authType.id);
-        }
+    try {
+      const user = userRepository.create(createUserDto);
+      user.authRole = createUserDto.role as unknown as Role;
+      user.password = await this.passwordService.hash(createUserDto.password);
+      const saved = await userRepository.save(user);
 
-        return await this.userRepository.findOne({ where: { id: saved.id } });
-      }catch(error){
-        const logger = new Logger();
-        logger.error(error);
-        throw new InternalServerErrorException(ErrorMessages.INTERNAL_SERVER_ERROR)
+      const authType = await authTypeRepository.findOne({ where: { alias: authTypeAlias } });
+      if (authType) {
+        await userRepository
+          .createQueryBuilder()
+          .relation(User, 'authTypes')
+          .of(saved.id)
+          .add(authType.id);
       }
+
+      return await userRepository.findOne({ where: { id: saved.id } });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      const logger = new Logger();
+      logger.error(error);
+      throw errorFactory(error);
+    }
   }
 
   async update(id: number, data: CreateUpdateUser) {
