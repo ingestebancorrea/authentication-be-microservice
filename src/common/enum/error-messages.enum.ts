@@ -10,5 +10,9 @@ export enum ErrorMessages {
     MISSING_TOKEN = 'Falta el token de autorización',
     INVALID_TOKEN = 'Token inválido o expirado',
     TOKEN_EXPIRED = 'El token expiró',
-    FACEBOOK_EMAIL_NOT_AVAILABLE = 'La cuenta de Facebook no expuso un email válido. Verificá que el email esté confirmado y que el permiso email esté otorgado'
+    FACEBOOK_EMAIL_NOT_AVAILABLE = 'La cuenta de Facebook no expuso un email válido. Verificá que el email esté confirmado y que el permiso email esté otorgado',
+    PROFILE_BLOCK_REQUIRED = 'Falta el bloque de datos del perfil para el rol seleccionado',
+    PROFILE_BLOCK_NOT_ALLOWED = 'El bloque de datos enviado no corresponde al rol seleccionado',
+    INVALID_BIRTH_DATE = 'La fecha de nacimiento no puede ser futura ni anterior a 1900',
+    LICENSE_NUMBER_ALREADY_REGISTERED = 'El número de licencia profesional ya está registrado'
 }

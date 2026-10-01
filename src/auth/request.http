@@ -10,15 +10,62 @@
 ###   auth_types: 1=PASS, 2=FACEBOOK, 3=GOOGLE, 4=AZURE
 
 ### Register con password -> devuelve el access_token de la API
+### confirm_password es obligatorio: debe coincidir con password (400 si no)
 POST {{host}}/auth/register-password
 Content-Type: application/json
 
 {
     "username": "prueba@physiosense.com",
     "password": "Prueba123",
+    "confirm_password": "Prueba123",
     "full_name": "Prueba Uno",
     "role": 1
 }
+
+### Registro como FISIOTERAPEUTA (role 1 = FIS) con su perfil.
+### physiotherapist_profile es obligatorio para el rol FIS.
+### phone y notes son los datos del paso 3; image_url va a users.image_url.
+POST {{host}}/auth/register-password
+Content-Type: application/json
+
+{
+    "username": "fisio.nuevo@physiosense.com",
+    "password": "Fisio123",
+    "confirm_password": "Fisio123",
+    "full_name": "Laura Gomez",
+    "role": 1,
+    "physiotherapist_profile": {
+        "specialty": "Deportiva",
+        "license_number": "LIC-0001",
+        "institution": "Universidad Nacional",
+        "years_of_experience": 8
+    },
+    "phone": "+54 11 5555 1234",
+    "image_url": "https://example.com/fisio.png",
+    "notes": "AtiendeVyCmartes"
+}
+
+### Registro como PACIENTE (role 2 = PAC) con su perfil.
+### dominant_hand solo admite: Derecha | Izquierda | Ambidiestro
+POST {{host}}/auth/register-password
+Content-Type: application/json
+
+{
+    "username": "paciente.nuevo@physiosense.com",
+    "password": "Paciente123",
+    "confirm_password": "Paciente123",
+    "full_name": "Carlos Ruiz",
+    "role": 2,
+    "patient_profile": {
+        "birth_date": "1995-04-12",
+        "country": "Argentina",
+        "city": "Cordoba",
+        "dominant_hand": "Derecha"
+    },
+    "phone": "+54 11 5555 9999",
+    "notes": "Referido por Laura"
+}
+
 
 ### Login con password -> mismo access_token, dura 15m
 POST {{host}}/auth/login-password
