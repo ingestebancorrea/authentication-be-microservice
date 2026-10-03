@@ -6,11 +6,14 @@ import { Role } from 'src/role/entities/role-entity';
 import { Physiotherapist } from 'src/physiotherapist/entities/physiotherapist.entity';
 import { Patient } from 'src/patient/entities/patient.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PasswordRecoveryToken } from './entities/password-recovery-token.entity';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
     UserModule,
-    TypeOrmModule.forFeature([Role, Physiotherapist, Patient]),
+    MailModule,
+    TypeOrmModule.forFeature([Role, Physiotherapist, Patient, PasswordRecoveryToken]),
   ],
   controllers: [AuthController],
   providers: [AuthService]
