@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const DEFAULT_SALT_ROUNDS = 12;
 
@@ -26,6 +27,12 @@ export class PasswordService {
   async hash(plainPassword: string): Promise<string> {
     if (!plainPassword) return null;
     return await bcrypt.hash(plainPassword, this.saltRounds);
+  }
+
+  // Hash determinista para tokens de recuperacion (no usa salt aleatorio)
+  hashRecoveryToken(token: string): string {
+    if (!token) return null;
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   async compare(plainPassword: string, hash: string): Promise<boolean> {

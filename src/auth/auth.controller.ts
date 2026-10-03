@@ -1,10 +1,12 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { federationObjects } from './services/factory/FedarationObjects';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
 import { RegisterPasswordDto } from './dto/register-password.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -51,5 +53,22 @@ export class AuthController {
       throw new BadRequestException(ErrorMessages.BAD_LOGIN_INSTANCE);
     }
     return this.authService.login(token, factory); 
+  }
+
+  @ApiResponse({status:200, description: 'Solicitud registrada. El correo se envía solo si el email está registrado'})
+  @ApiResponse({status:400, description: 'Payload inválido'})
+  @ApiResponse({status:500, description: ErrorMessages.RECOVERY_EMAIL_NOT_SENT})
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  forgotPassword( @Body() data: ForgotPasswordDto ){
+    return this.authService.forgotPassword(data);
+  }
+
+  @ApiResponse({status:200, description: ErrorMessages.RECOVERY_TOKEN_INVALID})
+  @ApiResponse({status:400, description: 'Token inválido o payload inválido'})
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  resetPassword( @Body() data: ResetPasswordDto ){
+    return this.authService.resetPassword(data);
   }
 }
