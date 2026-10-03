@@ -14,5 +14,8 @@ export enum ErrorMessages {
     PROFILE_BLOCK_REQUIRED = 'Falta el bloque de datos del perfil para el rol seleccionado',
     PROFILE_BLOCK_NOT_ALLOWED = 'El bloque de datos enviado no corresponde al rol seleccionado',
     INVALID_BIRTH_DATE = 'La fecha de nacimiento no puede ser futura ni anterior a 1900',
-    LICENSE_NUMBER_ALREADY_REGISTERED = 'El número de licencia profesional ya está registrado'
+    LICENSE_NUMBER_ALREADY_REGISTERED = 'El número de licencia profesional ya está registrado',
+    RECOVERY_TOKEN_INVALID = 'El enlace de recuperación no es válido o ya venció',
+    RECOVERY_EMAIL_NOT_SENT = 'No se pudo enviar el correo de recuperación. Intentá más tarde',
+    USER_HAS_NO_PASSWORD = 'La cuenta se registró con un proveedor externo y no tiene contraseña'
 }

@@ -15,6 +15,14 @@ import { Role } from 'src/role/entities/role-entity';
 import { Physiotherapist } from 'src/physiotherapist/entities/physiotherapist.entity';
 import { Patient } from 'src/patient/entities/patient.entity';
 import { DataSource, EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
+import { MailService } from 'src/mail/mail.service';
+import { PasswordRecoveryToken } from './entities/password-recovery-token.entity';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+
+const DEFAULT_RECOVERY_TTL_MINUTES = 30;
 
 @Injectable()
 export class AuthService {
@@ -24,9 +32,12 @@ export class AuthService {
     private jwtService: JwtService,
     private passwordService: PasswordService,
     private dataSource: DataSource,
+    private configService: ConfigService,
+    private mailService: MailService,
     @InjectRepository(Role) private rolRepository: Repository<Role>,
     @InjectRepository(Physiotherapist) private physiotherapistRepository: Repository<Physiotherapist>,
     @InjectRepository(Patient) private patientRepository: Repository<Patient>,
+    @InjectRepository(PasswordRecoveryToken) private recoveryTokenRepository: Repository<PasswordRecoveryToken>,
   ){}
 
   private readonly PROVIDER_AUTH_TYPE: Record<string, string> = {
@@ -130,8 +141,6 @@ async registerPassword(dto: RegisterPasswordDto) {
       return { user, profile };
     });
 
-    // Se conserva la forma de respuesta previa ({...user, access_token}) y se
-    // agrega `profile` para que el frontend reciba los datos del paso 2.
     const access_token = this.jwtService.sign(
       { username: user.username },
       { secret: process.env.JWT_SECRET },
@@ -149,7 +158,7 @@ async registerPassword(dto: RegisterPasswordDto) {
       const repository = manager.getRepository(Physiotherapist);
       return await repository.save(
         repository.create({
-          user: { id: user.id } as User,
+        user: { id: user.id },
           specialty: dto.physiotherapist_profile.specialty.trim(),
           license_number: dto.physiotherapist_profile.license_number.trim(),
           institution: dto.physiotherapist_profile.institution?.trim() ?? null,
@@ -239,6 +248,107 @@ async registerPassword(dto: RegisterPasswordDto) {
     const userToReturn = this.mapUser(user);
     const access_token = await this.generateAccesToken(userToReturn);
     return { ...userToReturn, access_token };
+  }
+
+  /**
+   * Paso 1 del recupero: genera un token, lo persiste hasheado y envía el
+   * correo con el enlace.
+   *
+   * La respuesta es idéntica exista o no el usuario para no permitir
+   * enumerar cuentas (mismo criterio que loginPassword con su usuario dummy).
+   * Las cuentas federadas no tienen contraseña que recuperar, así que también
+   * responden el mensaje genérico.
+   */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const username = dto.username.toLowerCase().trim();
+    const user = await this.usersService.findByEmailWithPassword(username);
+
+    // Token aleatorio de 256 bits: la entropía no depende de nada del usuario.
+    const token = randomBytes(32).toString('hex');
+    const expiresInMinutes = this.recoveryTtlMinutes();
+
+    if (user && user.is_active && user.password) {
+      await this.issueRecoveryToken(user, token, expiresInMinutes);
+
+      try {
+        await this.mailService.sendPasswordRecovery(
+          user.username,
+          user.full_name,
+          token,
+          this.recoveryResetUrl(),
+          expiresInMinutes,
+        );
+      } catch {
+        throw new InternalServerErrorException(ErrorMessages.RECOVERY_EMAIL_NOT_SENT);
+      }
+    }
+
+    return {
+      message: 'Si el correo está registrado, te enviaremos las instrucciones para recuperar tu contraseña',
+    };
+  }
+
+  /**
+   * Paso 2 del recupero: valida el token, consume todos los tokens vivos del
+   * usuario y guarda la nueva contraseña hasheada.
+   */
+  async resetPassword(dto: ResetPasswordDto) {
+    const tokenHash = this.passwordService.hashRecoveryToken(dto.token);
+    const recoveryToken = await this.recoveryTokenRepository.findOne({
+      where: { token_hash: tokenHash, used: false },
+      relations: { user: true },
+    });
+
+    const isExpired = recoveryToken && recoveryToken.expires_at.getTime() <= Date.now();
+    if (!recoveryToken || isExpired) {
+      throw new BadRequestException(ErrorMessages.RECOVERY_TOKEN_INVALID);
+    }
+
+    const user = recoveryToken.user;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(PasswordRecoveryToken).update(
+        { user: { id: user.id }, used: false },
+        { used: true, used_at: new Date() },
+      );
+
+      const hashedPassword = await this.passwordService.hash(dto.password);
+      await manager.getRepository(User).update({ id: user.id }, { password: hashedPassword });
+    });
+
+    return { message: 'La contraseña se actualizó correctamente' };
+  }
+
+  private async issueRecoveryToken(user: User, token: string, expiresInMinutes: number) {
+    const tokenHash = this.passwordService.hashRecoveryToken(token);
+
+    // Pedir un nuevo recupero invalida los tokens previos pendientes.
+    await this.recoveryTokenRepository.update(
+      { user: { id: user.id }, used: false },
+      { used: true, used_at: new Date() },
+    );
+
+    await this.recoveryTokenRepository.save(
+      this.recoveryTokenRepository.create({
+        token_hash: tokenHash,
+        user: { id: user.id } as User,
+        expires_at: new Date(Date.now() + expiresInMinutes * 60 * 1000),
+        used: false,
+      }),
+    );
+  }
+
+  private recoveryTtlMinutes(): number {
+    const configured = Number(this.configService.get<string>('PASSWORD_RECOVERY_TTL_MINUTES'));
+    return Number.isInteger(configured) && configured > 0
+      ? configured
+      : DEFAULT_RECOVERY_TTL_MINUTES;
+  }
+
+  private recoveryResetUrl(): string {
+    const base =
+      this.configService.get<string>('PASSWORD_RECOVERY_FRONTEND_URL') ?? '';
+    return `${base.replace(/\/+$/, '')}/reset-password`;
   }
 
   async login(token:string, creatorFactory:CreatorFactory) {
