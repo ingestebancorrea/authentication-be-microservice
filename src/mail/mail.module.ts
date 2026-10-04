@@ -4,31 +4,38 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './mail.service';
 
 /**
- * Transporte SMTP de Gmail (smtp.gmail.com:465, SSL).
- *
- * Gmail exige contraseña de aplicación en lugar de la contraseña de la cuenta:
- * Google Account -> Seguridad -> Verificación en 2 pasos -> Contraseñas de
- * aplicación. La credencial vive solo en SMTP_USER/SMTP_PASS (archivo .env).
- *
- * registerAsync + ConfigService por la misma razón que JwtConfigModule: el .env
- * todavía no está cargado cuando se evalúa la configuración del módulo.
+ * Transporte SMTP tradicional (STARTTLS).
+ * Usamos Brevo (smtp-relay.brevo.com:587) para evitar bloqueos de puertos SMTP en Render.
  */
 @Module({
   imports: [
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get<string>('MAIL_HOST') || 'smtp.gmail.com',
-          port: Number(config.get<string>('MAIL_PORT')) || 465,
-          secure: config.get<string>('MAIL_SECURE') !== 'false',
-          auth: {
-            user: config.get<string>('SMTP_USER'),
-            pass: config.get<string>('SMTP_PASS'),
+      useFactory: (config: ConfigService) => {
+        const host = config.get<string>('MAIL_HOST') || 'smtp-relay.brevo.com';
+        const port = Number(config.get<string>('MAIL_PORT')) || 587;
+        const secureEnv = config.get<string>('MAIL_SECURE');
+        const secure = secureEnv === 'true';
+        const user = config.get<string>('SMTP_USER');
+        const pass = config.get<string>('SMTP_PASS');
+
+        return {
+          transport: {
+            host,
+            port,
+            secure,
+            requireTLS: !secure && port === 587,
+            auth: {
+              user,
+              pass,
+            },
+            tls: {
+              rejectUnauthorized: false,
+            },
           },
-        },
-      }),
+        };
+      },
     }),
   ],
   providers: [MailService],

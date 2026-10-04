@@ -261,16 +261,24 @@ async registerPassword(dto: RegisterPasswordDto) {
    */
   async forgotPassword(dto: ForgotPasswordDto) {
     const username = dto.username.toLowerCase().trim();
+    console.log(`[FORGOT_PASSWORD] Solicitud recibida para: ${username}`);
+
     const user = await this.usersService.findByEmailWithPassword(username);
 
-    // Token aleatorio de 256 bits: la entropía no depende de nada del usuario.
+    // Token aleatorio de 256 bits
     const token = randomBytes(32).toString('hex');
     const expiresInMinutes = this.recoveryTtlMinutes();
 
     if (user && user.is_active && user.password) {
+      console.log(
+        `[FORGOT_PASSWORD] Usuario válido encontrado. ID=${user.id} | active=${user.is_active} | hasPassword=true`,
+      );
+
       await this.issueRecoveryToken(user, token, expiresInMinutes);
+      console.log(`[FORGOT_PASSWORD] Token de recuperación generado y persistido para ${user.username}`);
 
       try {
+        console.log(`[FORGOT_PASSWORD] Enviando correo de recuperación a ${user.username}...`);
         await this.mailService.sendPasswordRecovery(
           user.username,
           user.full_name,
@@ -278,9 +286,15 @@ async registerPassword(dto: RegisterPasswordDto) {
           this.recoveryResetUrl(),
           expiresInMinutes,
         );
-      } catch {
+        console.log(`[FORGOT_PASSWORD] Correo de recuperación enviado con éxito`);
+      } catch (error) {
+        console.error(`[FORGOT_PASSWORD] FALLO al enviar correo:`, error);
         throw new InternalServerErrorException(ErrorMessages.RECOVERY_EMAIL_NOT_SENT);
       }
+    } else {
+      console.log(
+        `[FORGOT_PASSWORD] Usuario no existe, inactivo o sin contraseña (federado). Respuesta genérica para evitar enumeración.`,
+      );
     }
 
     return {
