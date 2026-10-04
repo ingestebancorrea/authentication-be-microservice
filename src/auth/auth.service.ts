@@ -385,6 +385,7 @@ async registerPassword(dto: RegisterPasswordDto) {
     const userToReturn:UserToReturnDto =
     {
       id: user.id,
+      role: user.role,
       email: user.username,
       displayName: user.full_name,
       photoURL: user.image_url || null
