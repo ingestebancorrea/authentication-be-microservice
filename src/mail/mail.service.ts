@@ -1,18 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 
 /**
- * Envío de correo transaccional. Solo se usa para recuperación de contraseña.
+ * Envío de correo transaccional vía Brevo API v3 (HTTP/HTTPS).
+ * Compatible con Render Free (sin tráfico SMTP bloqueado).
  */
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
+  private readonly BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
-  constructor(
-    private readonly mailerService: MailerService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   /**
    * Envía el correo con el enlace/token de recuperación.
@@ -24,60 +22,101 @@ export class MailService {
     resetUrl: string,
     expiresInMinutes: number,
   ) {
+    const apiKey = this.configService.get<string>('BREVO_API_KEY');
+
+    if (!apiKey) {
+      this.logger.error('BREVO_API_KEY no está configurada');
+      throw new Error('BREVO_API_KEY no está configurada');
+    }
+
     const link = `${resetUrl}?token=${encodeURIComponent(token)}`;
-
-    const from = this.fromAddress();
+    const { senderEmail, senderName } = this.parseFromAddress();
     const subject = 'Recuperación de contraseña - PhysioSense';
-    const host = this.configService.get<string>('MAIL_HOST');
-    const port = this.configService.get<string>('MAIL_PORT');
-    const secure = this.configService.get<string>('MAIL_SECURE');
 
-    this.logger.log(
-      `Intentando enviar correo de recuperación | to=${to} | from=${from} | host=${host} | port=${port} | secure=${secure}`,
-    );
+    const textContent = [
+      `Hola ${name},`,
+      '',
+      'Recibimos una solicitud para recuperar la contraseña de tu cuenta.',
+      `Usa este enlace dentro de las próximas ${expiresInMinutes} minutos:`,
+      '',
+      link,
+      '',
+      'Si no solicitaste el cambio, ignora este mensaje y tu contraseña seguirá',
+      'siendo la misma.',
+    ].join('\n');
+
+    const htmlContent = this.passwordRecoveryTemplate(name, link, expiresInMinutes);
+
+    this.logger.log(`Enviando correo de recuperación vía Brevo API a: ${to}`);
 
     try {
-      const info = await this.mailerService.sendMail({
-        to,
-        from,
-        subject,
-        text: [
-          `Hola ${name},`,
-          '',
-          'Recibimos una solicitud para recuperar la contraseña de tu cuenta.',
-          `Usa este enlace dentro de las próximas ${expiresInMinutes} minutos:`,
-          '',
-          link,
-          '',
-          'Si no solicitaste el cambio, ignora este mensaje y tu contraseña seguirá',
-          'siendo la misma.',
-        ].join('\n'),
-        html: this.passwordRecoveryTemplate(name, link, expiresInMinutes),
+      const response = await fetch(this.BREVO_API_URL, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'api-key': apiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: {
+            name: senderName,
+            email: senderEmail,
+          },
+          to: [
+            {
+              email: to,
+              name: name || to,
+            },
+          ],
+          subject,
+          htmlContent,
+          textContent,
+        }),
       });
 
-      this.logger.log(
-        `Correo de recuperación enviado correctamente a ${to} | messageId=${info?.messageId || 'N/A'}`,
-      );
+      if (!response.ok) {
+        const errorBody = await response.text();
+        this.logger.error(
+          `Error al enviar correo vía Brevo API: ${response.status} ${response.statusText}`,
+        );
+        this.logger.error(`Respuesta de Brevo: ${errorBody}`);
+        throw new Error('No se pudo enviar el correo de recuperación');
+      }
+
+      this.logger.log('Correo de recuperación enviado correctamente vía Brevo API');
     } catch (error) {
-      this.logger.error(
-        `ERROR al enviar correo de recuperación a ${to}: ${error?.message}`,
-      );
-      if (error?.response) {
-        this.logger.error(`SMTP response: ${error.response}`);
-      }
-      if (error?.stack) {
-        this.logger.error(`Stack: ${error.stack}`);
-      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Fallo al enviar correo vía Brevo API: ${message}`);
       throw error;
     }
   }
 
-  private fromAddress(): string {
-    return (
-      this.configService.get<string>('MAIL_FROM') ||
-      this.configService.get<string>('SMTP_USER') ||
-      ''
-    );
+  private parseFromAddress(): { senderEmail: string; senderName: string } {
+    const from = this.configService.get<string>('MAIL_FROM') || '';
+
+    const match = from.match(/^(.*)<([^>]+)>$/);
+    if (match) {
+      const name = match[1].trim();
+      const email = match[2].trim();
+      return {
+        senderName: name || 'PhysioSense',
+        senderEmail: email,
+      };
+    }
+
+    const trimmed = from.trim();
+    if (trimmed.includes('@')) {
+      return {
+        senderName: 'PhysioSense',
+        senderEmail: trimmed,
+      };
+    }
+
+    // Fallback por si no está configurado
+    return {
+      senderName: 'PhysioSense',
+      senderEmail: 'no-reply@physiosense.com',
+    };
   }
 
   private passwordRecoveryTemplate(name: string, link: string, expiresInMinutes: number) {

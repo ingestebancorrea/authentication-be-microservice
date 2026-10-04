@@ -277,20 +277,23 @@ async registerPassword(dto: RegisterPasswordDto) {
       await this.issueRecoveryToken(user, token, expiresInMinutes);
       console.log(`[FORGOT_PASSWORD] Token de recuperación generado y persistido para ${user.username}`);
 
-      try {
-        console.log(`[FORGOT_PASSWORD] Enviando correo de recuperación a ${user.username}...`);
-        await this.mailService.sendPasswordRecovery(
+      // El envio NO bloquea la respuesta HTTP. El SMTP saliente puede
+      // colgarse y el usuario no debe pagar ese timeout: el token ya quedo
+      // persistido, la respuesta es la misma exista o no el correo.
+      void this.mailService
+        .sendPasswordRecovery(
           user.username,
           user.full_name,
           token,
           this.recoveryResetUrl(),
           expiresInMinutes,
-        );
-        console.log(`[FORGOT_PASSWORD] Correo de recuperación enviado con éxito`);
-      } catch (error) {
-        console.error(`[FORGOT_PASSWORD] FALLO al enviar correo:`, error);
-        throw new InternalServerErrorException(ErrorMessages.RECOVERY_EMAIL_NOT_SENT);
-      }
+        )
+        .then(() => {
+          console.log(`[FORGOT_PASSWORD] Correo de recuperación enviado con éxito`);
+        })
+        .catch((error) => {
+          console.error(`[FORGOT_PASSWORD] FALLO al enviar correo:`, error);
+        });
     } else {
       console.log(
         `[FORGOT_PASSWORD] Usuario no existe, inactivo o sin contraseña (federado). Respuesta genérica para evitar enumeración.`,
