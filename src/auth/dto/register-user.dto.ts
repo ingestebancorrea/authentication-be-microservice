@@ -6,7 +6,7 @@ export class RegisterUserDto {
     @ApiProperty({
         name:'token',
         type:'string',
-        description:'Generated token by Google or Microsoft'
+        description:'Token generado por Google o Microsoft'
       })
     @IsString()
     token:string;
@@ -14,7 +14,7 @@ export class RegisterUserDto {
     @ApiProperty({
         name:'loginprovider',
         type:'string',
-        description: 'Sing in provider [googleTokenValidation, azureTokenValidation, facebookTokenValidation]'
+        description: 'Proveedor de inicio de sesión [googleTokenValidation, azureTokenValidation, facebookTokenValidation]'
     })
     @IsString()
     loginprovider:string;
@@ -22,7 +22,7 @@ export class RegisterUserDto {
     @ApiProperty({
         name:'alias_role',
         type:'string',
-        description: 'Role with which the user is going to register (PROFESOR, ESTUDIANTE)',
+        description: 'Rol con el que se va a registrar el usuario (PROFESOR, ESTUDIANTE)',
     })
     @Length(2,50)
     @IsString()

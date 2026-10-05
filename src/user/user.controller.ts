@@ -4,6 +4,8 @@ import { CreateUpdateUser } from './dto/createUpdateUser.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import { ErrorMessages } from 'src/common/enum/error-messages.enum';
+import { AuthMessages } from 'src/common/enum/auth-messages.enum';
 
 @ApiTags('User')
 @ApiBearerAuth()
@@ -22,11 +24,11 @@ export class UsersController {
   async show(@Param('id') id: number) {
     const user = await this.userService.findOne(id);
     if (user) return user;
-    throw new NotFoundException('User not found');
+    throw new NotFoundException(ErrorMessages.USER_NOT_FOUND);
   }
 
   @Post()
-  @ApiCreatedResponse({ description: 'Created Succesfully' })
+  @ApiCreatedResponse({ description: AuthMessages.USER_CREATED })
   @UseGuards(JwtAuthGuard)
   async store(@Body() data: CreateUserDto) {
     return await this.userService.store(data);
