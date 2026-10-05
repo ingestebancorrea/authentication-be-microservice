@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
+import { AuthMessages } from 'src/common/enum/auth-messages.enum';
+import { formatMessage } from 'src/common/utils/format-message.util';
 import { ProfileRoleAlias } from 'src/common/enum/profile-role.enum';
 import { UsersService } from 'src/user/user.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
@@ -73,7 +75,7 @@ export class AuthService {
       }
       user = await this.usersService.store(createUserDto, this.PROVIDER_AUTH_TYPE[loginprovider] ?? 'PASS');
     }else{
-      throw new ConflictException(`Ya existe un usuario registrado con el email ${payload.email}`);
+      throw new ConflictException(formatMessage(AuthMessages.USER_ALREADY_REGISTERED_BY_EMAIL, { email: payload.email }));
     }
     const userToReturn = this.mapUser(user);
     const access_token = await this.generateAccesToken(userToReturn);
@@ -88,7 +90,7 @@ async registerPassword(dto: RegisterPasswordDto) {
 
     const existing = await this.usersService.findByEmail(username);
     if (existing) {
-      throw new ConflictException(`User ${dto.username} already is registered`);
+      throw new ConflictException(formatMessage(AuthMessages.USER_ALREADY_REGISTERED, { username: dto.username }));
     }
 
     const role = await this.rolRepository.findOne({ where: { id: dto.role } });
@@ -228,7 +230,7 @@ async registerPassword(dto: RegisterPasswordDto) {
   private translateDbError(error: unknown, username: string) {
     const driverError = (error as QueryFailedError)?.driverError as { code?: string } | undefined;
     if (error instanceof QueryFailedError && driverError?.code === '23505') {
-      return new ConflictException(`User ${username} already is registered`);
+      return new ConflictException(formatMessage(AuthMessages.USER_ALREADY_REGISTERED, { username }));
     }
     return new InternalServerErrorException(ErrorMessages.INTERNAL_SERVER_ERROR);
   }
@@ -237,12 +239,12 @@ async registerPassword(dto: RegisterPasswordDto) {
     const user = await this.usersService.findByEmailWithPassword(dto.username.toLowerCase().trim());
     if (!user) {
       await this.passwordService.verify(dto.password, null);
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(AuthMessages.INVALID_CREDENTIALS);
     }
 
     const isValid = await this.passwordService.verify(dto.password, user.password);
     if (!isValid) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException(AuthMessages.INVALID_CREDENTIALS);
     }
 
     const userToReturn = this.mapUser(user);
@@ -301,7 +303,7 @@ async registerPassword(dto: RegisterPasswordDto) {
     }
 
     return {
-      message: 'Si el correo está registrado, te enviaremos las instrucciones para recuperar tu contraseña',
+      message: AuthMessages.RECOVERY_REQUEST_ACCEPTED,
     };
   }
 
@@ -333,7 +335,7 @@ async registerPassword(dto: RegisterPasswordDto) {
       await manager.getRepository(User).update({ id: user.id }, { password: hashedPassword });
     });
 
-    return { message: 'La contraseña se actualizó correctamente' };
+    return { message: AuthMessages.PASSWORD_UPDATED };
   }
 
   private async issueRecoveryToken(user: User, token: string, expiresInMinutes: number) {
@@ -377,7 +379,7 @@ async registerPassword(dto: RegisterPasswordDto) {
     const email = payload.email?.toLowerCase().trim();
     const user = email ? await this.usersService.findByEmail(email) : undefined;
     if(!user){
-      throw new NotFoundException(`User ${payload.email} not found`);
+      throw new NotFoundException(formatMessage(AuthMessages.USER_NOT_FOUND_BY_EMAIL, { email: payload.email }));
     }
 
     const userToReturn = this.mapUser(user); 

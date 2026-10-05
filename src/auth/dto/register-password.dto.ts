@@ -11,6 +11,7 @@ import {
     ValidateNested,
 } from "class-validator";
 import { PasswordMatch } from "src/common/validators/password-match.validator";
+import { AuthMessages } from "src/common/enum/auth-messages.enum";
 import { PatientProfileDto } from "./patient-profile.dto";
 import { PhysiotherapistProfileDto } from "./physiotherapist-profile.dto";
 
@@ -26,7 +27,7 @@ export class RegisterPasswordDto {
     @MaxLength(150)
     @Matches(
         /(?:(?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-        message: 'The password must have a Uppercase, lowercase letter and a number'
+        message: AuthMessages.PASSWORD_FORMAT_REQUIRED
     })
     password: string;
 
@@ -55,7 +56,7 @@ export class RegisterPasswordDto {
     @IsOptional()
     @MaxLength(30)
     @Matches(/^[0-9+\-\s()]{6,30}$/, {
-        message: 'El teléfono solo puede contener números, espacios y los signos + - ( )'
+        message: AuthMessages.PHONE_FORMAT
     })
     phone: string;
 

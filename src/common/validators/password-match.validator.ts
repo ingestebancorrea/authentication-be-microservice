@@ -5,6 +5,8 @@ import {
     ValidatorConstraint,
     ValidatorConstraintInterface,
 } from 'class-validator';
+import { AuthMessages } from '../enum/auth-messages.enum';
+import { formatMessage } from '../utils/format-message.util';
 
 @ValidatorConstraint({ name: 'passwordMatch', async: false })
 export class PasswordMatchValidator implements ValidatorConstraintInterface {
@@ -14,9 +16,10 @@ export class PasswordMatchValidator implements ValidatorConstraintInterface {
         return typeof value === 'string' && value === relatedValue;
     }
 
-    defaultMessage(args: ValidationArguments): string {
-        const [relatedPropertyName] = args.constraints;
-        return `La confirmación de contraseña no coincide con ${relatedPropertyName}`;
+    defaultMessage(): string {
+        return formatMessage(AuthMessages.PASSWORD_CONFIRMATION_MISMATCH, {
+            property: 'la contraseña',
+        });
     }
 }
 
