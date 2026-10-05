@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { federationObjects } from './services/factory/FedarationObjects';
 import { ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
+import { AuthMessages } from 'src/common/enum/auth-messages.enum';
 import { RegisterPasswordDto } from './dto/register-password.dto';
 import { LoginPasswordDto } from './dto/login-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -13,7 +14,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 export class AuthController {
   constructor( private readonly authService: AuthService) {}
 
-  @ApiResponse({status:201, description: 'Success SingUp'})
+  @ApiResponse({status:201, description: AuthMessages.REGISTRATION_SUCCESS})
   @ApiResponse({status:400, description: ErrorMessages.BAD_LOGIN_INSTANCE})
   @ApiResponse({status:404, description: ErrorMessages.ROLE_NOT_FOUND})
   @ApiResponse({status:401, description: ErrorMessages.NOT_VALID_TOKEN})
@@ -30,13 +31,13 @@ export class AuthController {
   @ApiResponse({status:400, description: ErrorMessages.BAD_LOGIN_INSTANCE})
   @ApiResponse({status:401, description: ErrorMessages.NOT_VALID_TOKEN})
   @ApiResponse({status:404, description: ErrorMessages.ROLE_NOT_FOUND})
-  @ApiResponse({status:409, description: 'El usuario ya está registrado'})
+  @ApiResponse({status:409, description: AuthMessages.REGISTRATION_CONFLICT})
   @Post('register-password')
   registerWithPassword( @Body() data: RegisterPasswordDto ){
     return this.authService.registerPassword(data);
   }
 
-  @ApiResponse({status:401, description: 'Credenciales inválidas'})
+  @ApiResponse({status:401, description: AuthMessages.INVALID_CREDENTIALS})
   @Post('login-password')
   loginPassword( @Body() data: LoginPasswordDto ){
     return this.authService.loginPassword(data);

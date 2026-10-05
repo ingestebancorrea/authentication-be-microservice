@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { PasswordMatch } from 'src/common/validators/password-match.validator';
+import { AuthMessages } from 'src/common/enum/auth-messages.enum';
 
 export class ResetPasswordDto {
   @ApiProperty({ type: String, description: 'Token recibido en el correo de recuperación' })
@@ -12,7 +13,7 @@ export class ResetPasswordDto {
   @MinLength(6)
   @MaxLength(150)
   @Matches(/(?:(?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-    message: 'The password must have a Uppercase, lowercase letter and a number',
+    message: AuthMessages.PASSWORD_FORMAT_REQUIRED,
   })
   password: string;
 

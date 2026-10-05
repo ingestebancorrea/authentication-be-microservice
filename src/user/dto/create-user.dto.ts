@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEmail, IsNumber, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { AuthMessages } from 'src/common/enum/auth-messages.enum';
 
 export class CreateUserDto {
     @ApiProperty({
         type: String,
-        description: 'This is the email',
+        description: 'Este es el email',
     })
     @MinLength(5)
     @MaxLength(25)
@@ -14,7 +15,7 @@ export class CreateUserDto {
 
     @ApiProperty({
         type: String,
-        description: 'The password must have a Uppercase, lowercase letter and a number',
+        description: AuthMessages.PASSWORD_FORMAT_REQUIRED,
     })
     @IsString()
     @MinLength(6)
@@ -22,13 +23,13 @@ export class CreateUserDto {
     @MaxLength(150)
     @Matches(
         /(?:(?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
-        message: 'The password must have a Uppercase, lowercase letter and a number'
+        message: AuthMessages.PASSWORD_FORMAT_REQUIRED
     })
     password: string;
 
     @ApiProperty({
         type: String,
-        description: 'This is the full name',
+        description: 'Este es el nombre completo',
     })
     @IsString()
     @MinLength(6)
@@ -45,7 +46,7 @@ export class CreateUserDto {
 
     @ApiProperty({
         type: String,
-        description: 'This is the image of someone people',
+        description: 'Esta es la imagen de la persona',
     })
     @IsString()
     @IsOptional()
@@ -53,14 +54,14 @@ export class CreateUserDto {
 
     @ApiProperty({
         type: Number,
-        description: 'This is a unique key',
+        description: 'Esta es una clave única',
     })
     @IsNumber()
     role: number;
 
     @ApiProperty({
         type: Boolean,
-        description: 'This allow know if a user is active or desactive in the system',
+        description: 'Permite saber si un usuario está activo o desactivado en el sistema',
     })
     @IsBoolean()
     is_active:boolean
