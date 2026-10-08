@@ -28,6 +28,19 @@ export class UsersService {
     return this.userRepository.findOne({where:{id}});
   }
 
+  /**
+   * Como `findOne`, pero con el rol cargado.
+   *
+   * `role` (el id) viene de `@RelationId` y sale siempre; `authRole` no, porque
+   * la relacion no es eager. Sin esto no se puede devolver el alias 'FIS'/'PAC'.
+   */
+  async findWithRole(id: number): Promise<User | undefined> {
+    return this.userRepository.findOne({
+      where: { id },
+      relations: { authRole: true },
+    });
+  }
+
   async findBy(criteria: any): Promise<User[]> {
       return this.userRepository.find(criteria);
   }
