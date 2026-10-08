@@ -3,6 +3,8 @@ import { UsersService } from './user.service';
 import { CreateUpdateUser } from './dto/createUpdateUser.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CreateUserDto } from './dto/create-user.dto';
+import { PatientService } from 'src/patient/patient.service';
+import { PhysiotherapistService } from 'src/physiotherapist/physiotherapist.service';
 import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
 import { AuthMessages } from 'src/common/enum/auth-messages.enum';
@@ -11,7 +13,11 @@ import { AuthMessages } from 'src/common/enum/auth-messages.enum';
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private userService: UsersService) {}
+  constructor(
+    private userService: UsersService,
+    private patientService: PatientService,
+    private physiotherapistService: PhysiotherapistService,
+  ) {}
 
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -25,6 +31,36 @@ export class UsersController {
     const user = await this.userService.findOne(id);
     if (user) return user;
     throw new NotFoundException(ErrorMessages.USER_NOT_FOUND);
+  }
+
+  /**
+   * Rol y perfil del usuario, para que physiosense-core-be-microservice
+   * resuelva el actor.
+   *
+   * El JWT solo trae { uuid, username, name }: sin este endpoint ese
+   * microservicio tendria que adivinar si el usuario es FIS o PAC y cual es su
+   * patient_id / physiotherapist_id.
+   */
+  @Get(':id/profile')
+  @UseGuards(JwtAuthGuard)
+  async profile(@Param('id') id: number) {
+    const user = await this.userService.findWithRole(id);
+    if (!user) throw new NotFoundException('User not found');
+
+    const patient = await this.patientService.findByUserId(user.id);
+    const physiotherapist = await this.physiotherapistService.findByUserId(user.id);
+
+    return {
+      user_id: user.id,
+      username: user.username,
+      full_name: user.full_name,
+      image_url: user.image_url ?? null,
+      is_active: user.is_active,
+      role_id: user.role,
+      role_alias: user.authRole?.alias ?? null,
+      patient_id: patient?.patient_id ?? null,
+      physiotherapist_id: physiotherapist?.physiotherapist_id ?? null,
+    };
   }
 
   @Post()
