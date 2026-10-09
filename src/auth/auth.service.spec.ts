@@ -14,6 +14,7 @@ import { MailService } from 'src/mail/mail.service';
 import { ErrorMessages } from 'src/common/enum/error-messages.enum';
 import { User } from 'src/user/entities/user.entity';
 import { PasswordRecoveryToken } from './entities/password-recovery-token.entity';
+import { UserToReturnDto } from './dto/return-user.dto';
 
 const recoveryTokenRepository = {
   findOne: jest.fn(),
@@ -21,6 +22,11 @@ const recoveryTokenRepository = {
   create: jest.fn((data) => data),
   save: jest.fn(),
 };
+
+const roleRepository = { findOne: jest.fn() };
+const physiotherapistRepository = { findOne: jest.fn() };
+const patientRepository = { findOne: jest.fn() };
+const jwtService = new JwtService();
 
 const manager = {
   getRepository: jest.fn(() => ({
@@ -41,7 +47,7 @@ describe('AuthService - password recovery', () => {
       providers: [
         AuthService,
         { provide: UsersService, useValue: usersService },
-        { provide: JwtService, useValue: { sign: jest.fn(), signAsync: jest.fn() } },
+        { provide: JwtService, useValue: jwtService },
         PasswordService,
         { provide: DataSource, useValue: { transaction: jest.fn(async (cb) => cb(manager as unknown as EntityManager)) } },
         {
@@ -55,9 +61,9 @@ describe('AuthService - password recovery', () => {
           },
         },
         { provide: MailService, useValue: { sendPasswordRecovery: jest.fn() } },
-        { provide: getTypeOrmRepositoryToken(Role), useValue: {} },
-        { provide: getTypeOrmRepositoryToken(Physiotherapist), useValue: {} },
-        { provide: getTypeOrmRepositoryToken(Patient), useValue: {} },
+        { provide: getTypeOrmRepositoryToken(Role), useValue: roleRepository },
+        { provide: getTypeOrmRepositoryToken(Physiotherapist), useValue: physiotherapistRepository },
+        { provide: getTypeOrmRepositoryToken(Patient), useValue: patientRepository },
         { provide: getTypeOrmRepositoryToken(PasswordRecoveryToken), useValue: recoveryTokenRepository },
       ],
     }).compile();
@@ -177,6 +183,68 @@ describe('AuthService - password recovery', () => {
       await expect(
         service.resetPassword({ token: 'x', password: 'Nueva123', confirm_password: 'Nueva123' }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('generateAccesToken claims', () => {
+    const TEST_SECRET = 'test-secret-hs256';
+
+    const baseUser: UserToReturnDto = {
+      id: 123,
+      role: 1,
+      email: 'juan',
+      displayName: 'Juan Perez',
+      photoURL: null,
+      isActive: true,
+    };
+
+    const decode = (token: string) =>
+      jwtService.verifyAsync(token, { secret: TEST_SECRET, algorithms: ['HS256'] });
+
+    beforeAll(() => {
+      process.env.JWT_SECRET = TEST_SECRET;
+    });
+
+    it('embeds FIS role + physiotherapist_id and nulls patient_id', async () => {
+      roleRepository.findOne.mockResolvedValue({ id: 1, alias: 'FIS' });
+      physiotherapistRepository.findOne.mockResolvedValue({ physiotherapist_id: 77 });
+      patientRepository.findOne.mockResolvedValue(null);
+
+      const token = await service.generateAccesToken(baseUser);
+      const payload = await decode(token);
+
+      expect(payload).toEqual(
+        expect.objectContaining({
+          uuid: 123,
+          username: 'juan',
+          name: 'Juan Perez',
+          role_alias: 'FIS',
+          patient_id: null,
+          physiotherapist_id: 77,
+          is_active: true,
+        }),
+      );
+
+      const [header] = token.split('.');
+      expect(JSON.parse(Buffer.from(header, 'base64url').toString()).alg).toBe('HS256');
+    });
+
+    it('embeds PAC role + patient_id and nulls physiotherapist_id', async () => {
+      roleRepository.findOne.mockResolvedValue({ id: 2, alias: 'PAC' });
+      physiotherapistRepository.findOne.mockResolvedValue(null);
+      patientRepository.findOne.mockResolvedValue({ patient_id: 45 });
+
+      const token = await service.generateAccesToken({ ...baseUser, role: 2 });
+      const payload = await decode(token);
+
+      expect(payload).toEqual(
+        expect.objectContaining({
+          uuid: 123,
+          role_alias: 'PAC',
+          patient_id: 45,
+          physiotherapist_id: null,
+        }),
+      );
     });
   });
 });
