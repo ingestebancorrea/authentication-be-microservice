@@ -34,12 +34,12 @@ export class UsersController {
   }
 
   /**
-   * Rol y perfil del usuario, para que physiosense-core-be-microservice
-   * resuelva el actor.
+   * Rol y perfil del usuario.
    *
-   * El JWT solo trae { uuid, username, name }: sin este endpoint ese
-   * microservicio tendria que adivinar si el usuario es FIS o PAC y cual es su
-   * patient_id / physiotherapist_id.
+   * El access token ya incluye role_alias, patient_id y physiotherapist_id, por
+   * lo que physiosense-core-be-microservice puede resolver el actor sin llamar
+   * a este endpoint en cada request. Se mantiene por compatibilidad y para
+   * obtener el resto del perfil (nombre, avatar, etc.).
    */
   @Get(':id/profile')
   @UseGuards(JwtAuthGuard)

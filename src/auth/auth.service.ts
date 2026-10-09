@@ -143,10 +143,7 @@ async registerPassword(dto: RegisterPasswordDto) {
       return { user, profile };
     });
 
-    const access_token = this.jwtService.sign(
-      { username: user.username },
-      { secret: process.env.JWT_SECRET },
-    );
+    const access_token = await this.generateAccesToken(this.mapUser(user));
     return { ...user, profile, access_token };
   }
 
@@ -387,17 +384,58 @@ async registerPassword(dto: RegisterPasswordDto) {
     return {...userToReturn,access_token}
   }
 
+  /**
+   * Emite el access token con el rol y los IDs de perfil embebidos.
+   *
+   * Resolver el perfil aqui (una sola vez por login/registro) permite que
+   * physiosense-core-be-microservice construya su "actor" directamente desde
+   * los claims y deje de llamar a GET /users/:id/profile en cada request.
+   *
+   * El algoritmo sigue siendo HS256 y el secreto JWT_SECRET.
+   */
   async generateAccesToken(user:UserToReturnDto){
+    const { roleAlias, patientId, physiotherapistId } =
+      await this.resolveTokenProfile(user.id, user.role);
+
+    const isPatient = roleAlias === ProfileRoleAlias.PATIENT;
+    const isPhysiotherapist = roleAlias === ProfileRoleAlias.PHYSIOTHERAPIST;
+
     return await this.jwtService.signAsync(
       {
         uuid: user.id,
         username: user.email,
         name: user.displayName,
+        role_alias: roleAlias,
+        patient_id: isPatient ? patientId : null,
+        physiotherapist_id: isPhysiotherapist ? physiotherapistId : null,
+        is_active: user.isActive ?? true,
       },{
         secret: process.env.JWT_SECRET,
         expiresIn:'15m'
       }
     );
+  }
+
+  /**
+   * Rol y perfil del usuario para poblar los claims del token.
+   *
+   * Un usuario solo puede tener un perfil, por lo que el id del perfil que no
+   * corresponde a su rol queda en null (regla FIS/PAC excluyentes).
+   */
+  private async resolveTokenProfile(userId: number, roleId?: number) {
+    const [role, patient, physiotherapist] = await Promise.all([
+      roleId
+        ? this.rolRepository.findOne({ where: { id: roleId } })
+        : Promise.resolve(null),
+      this.patientRepository.findOne({ where: { user: { id: userId } } }),
+      this.physiotherapistRepository.findOne({ where: { user: { id: userId } } }),
+    ]);
+
+    return {
+      roleAlias: role?.alias ?? null,
+      patientId: patient?.patient_id ?? null,
+      physiotherapistId: physiotherapist?.physiotherapist_id ?? null,
+    };
   }
 
   mapUser = (user:User):UserToReturnDto=> {
@@ -407,7 +445,8 @@ async registerPassword(dto: RegisterPasswordDto) {
       role: user.role,
       email: user.username,
       displayName: user.full_name,
-      photoURL: user.image_url || null
+      photoURL: user.image_url || null,
+      isActive: user.is_active,
     }
     return userToReturn;
   }
