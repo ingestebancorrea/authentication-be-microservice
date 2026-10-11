@@ -22,6 +22,7 @@ import { PatientModule } from './patient/patient.module';
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
+      schema: process.env.DB_SCHEMA || undefined,
       entities: [ User ],
       subscribers: [ ],
       autoLoadEntities: true,
