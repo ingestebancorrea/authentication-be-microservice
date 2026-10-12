@@ -26,7 +26,7 @@ import { PatientModule } from './patient/patient.module';
       entities: [ User ],
       subscribers: [ ],
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
     AuthModule, 
     AuthTypeModule, 
